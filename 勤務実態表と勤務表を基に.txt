@@ -1,0 +1,56 @@
+勤務実態表と勤務表を基に
+
+乗組員勤務表を作成
+
+
+新しいファイルを作成　2024-02「あさか丸」乗組員勤務表
+session['monthSelect'] = request.form['monthSelect']
+new_filename = f"{session['monthSelect']}「あさか丸」乗組員.xlsx"
+
+１．勤務表テンプレートの作成   asaka_shift_schedule.xlsx   D3  G3   J3  N3  Q3  T3
+
+２．勤務表ファイルを作成　日付「あさか丸」乗組員勤務表 
+	B2 →　２０２４年２月　勤務表　　
+	職別　D7～D37 　　　　E,H,K,N,Q,T 5～35　を　コピー担当シート毎に　
+
+３．勤務表テンプレートの6人の名前のSheetを作成　
+
+４．その月の日付と曜日を挿入->　勤務実態表からコピー
+	B2 に　'%Y年%m月'⁺　勤務表
+2024/02/10 済
+
+D3にそれぞれの名前を入れる
+
+５．個々の乗組員の勤務スケジュール（職別）をコピー　あさか丸勤務表→乗組員勤務表
+
+６．勤務実態表　から　職別
+
+７．勤務実態表から　日勤　を　職別の記入されている行にコピー
+
+８。当直　を　職別の記入されている行に、次の　明け　と一緒にコピー　明け　職別が記入されていない（休日）なっている場合は当直の職別をコピー
+
+
+
+
+
+def create_crew_shift():
+	session['monthSelect'] = request.form['monthSelect']
+	new_filename = f"{session['monthSelect']}「あさか丸」乗組員勤務表.xlsx"
+	template_path = 'crew_shift_template.xlsx'
+	new_file_path = generate_new_filename(os.path.join('crew_shift', new_filename))
+	workbook = load_workbook(template_path)
+	#テンプレートから新しいファイルを作成、日付と曜日を入れる
+	fill_dates_and_weekdays(workbook, session['monthSelect'],template_path)
+
+	先ずは、カレントデレクトリーにある'work_records'の中に{session['monthSelect']}が先頭文字列にあるファイルが
+	あるかどうかを確認し、なければ、flash("対応する「勤務実態表」がありません:")　として処理を終わらせ、あれば処理を続ける
+	上記メソッドで新しいファイルをテンプレートをもとに作成
+	カレントデレクトリーにある
+	name.txt
+	のリストにある名前のshieetを作成してそれぞれに日付曜日などが入力されたSheet（'name'）をそままコピー
+	最後に元にあった'name'という名前のSheetを削除
+ここまでは終了　2024/02/10
+
+
+
+

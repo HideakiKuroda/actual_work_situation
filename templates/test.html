@@ -1,0 +1,79 @@
+<htmlall> <p>
+    <!DOCTYPE html>
+  
+    <head lang="ja">
+      <meta charset="utf-8" />
+  
+      <!-- ボタン1 -->
+      <script>
+      function LinkClick1() {
+          var f = document.forms["form1"];
+          f.method = "POST"; 
+          f.submit(); 
+          return true;
+        }
+      </script>
+  
+      <!-- ボタン2 -->
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+      <script>
+      function LinkClick2(){
+        $.post( '/sub', 'ポケモン1=ラティアス&ポケモン2=ラティオス' )
+        .done(function( data ) {
+          $("htmlall").html(data);
+          })
+        };
+      </script>
+      <!-- ボタン3 -->
+      <script>
+        var myBooks = {{ books|tojson }};
+        function LinkClick3(){
+          let testRequest = new XMLHttpRequest();
+          testRequest.open('POST', 'sub');
+          testRequest.setRequestHeader('content-type', 'application/json');
+          testRequest.send(myBooks);
+        }
+      </script>
+  
+      <!-- ボタン4 -->
+      <script>
+        var myBirds = {{ birds|tojson }};
+      </script>
+  
+      <!-- ボタン5 -->
+      <script>
+      function LinkClick5() {
+        location.href = '/sub';
+      }
+      </script>
+  
+      <title>ここはトップページ</title>
+    </head>
+  
+  
+    <h1>トップ</h1>
+    <!-- ボタン1 -->
+    <button onclick="LinkClick1();">ボタン1(formの値をPOST)</button>
+  
+    <form name="form1" action="sub">
+      <input type="hidden" name="ポケモン1" value="ソーナノ">
+      <input type="hidden" name="ポケモン2" value="チルット">
+    </form>
+  
+    <!-- ボタン2 -->
+    <button onclick="return LinkClick2();">ボタン2(jqueryでPOSTしてページ遷移、返り値のHTMLでHTML全体を書き換え)</button> 
+  
+    <!-- ボタン3 -->
+    <br>
+    <button onclick="LinkClick3();">ボタン3(XMLHttpRequestでPOST)</button>
+  
+    <!-- ボタン4 -->
+    <br>
+    <button onclick="alert('birds: ' + myBirds.join(', '))" >ボタン4(渡されたbirdsオブジェクトをjsonにしてアラート)</button>
+  
+    <!-- ボタン5 -->
+    <br>
+    <button onclick="LinkClick5();">ボタン5(js側でページ遷移)</button> 
+  
+  </p></htmlall>
+  
