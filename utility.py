@@ -1,4 +1,4 @@
-from flask import flash
+from flask import flash, send_file
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Border, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -10,6 +10,7 @@ import shutil
 import time
 from copy import copy
 import logging
+import glob
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -119,6 +120,7 @@ def convert_category(value):
     else:
         return value
 
+#日報のデータを勤務ジッタ表に転記する
 def copy_data_to_work_record(selected_files, work_record_file):
     target_dir = "work_records"
     work_record_path = os.path.join(target_dir, work_record_file)
@@ -160,15 +162,15 @@ def copy_data_to_work_record(selected_files, work_record_file):
         wb_report.close()
        # 勤務実態表ファイルを保存
     wb_work_record.save(work_record_path)
-    time.sleep(3)  # 2秒待機
-    # 作業日報ファイルを新しいフォルダに移動
-    failed_moves = move_files_with_retry(selected_files, new_folder_path,abs_base_dir)
-    if failed_moves:
-        flash("以下のファイルの移動に失敗しました:")
-        for file_name in failed_moves:
-            flash(f"{file_name} -> {new_folder_path}")
-    else:
-        flash("ファイルの書き込みと移動が完了しました")       
+    # time.sleep(3)  # 2秒待機
+    # # 作業日報ファイルを新しいフォルダに移動
+    # failed_moves = move_files_with_retry(selected_files, new_folder_path,abs_base_dir)
+    # if failed_moves:
+    #     flash("以下のファイルの移動に失敗しました:")
+    #     for file_name in failed_moves:
+    #         flash(f"{file_name} -> {new_folder_path}")
+    # else:
+    flash("勤務実態表ファイルの書き込みが完了しました。ファイルがダウンロードされます")       
 
 
 def copy_cell(source_cell, target_cell):
@@ -200,6 +202,129 @@ def copy_dates_to_new_sheet(workbook, template_sheet_name, target_sheet_name):
     for row_idx in range(min_row, max_row + 1):
             if row_idx in template_sheet.row_dimensions:
                 target_sheet.row_dimensions[row_idx].height = template_sheet.row_dimensions[row_idx].height
+
+#crew_shift　の中の日付「あさか丸」乗組員勤務表の最新 を取得
+def find_latest_file(month):
+    files = glob.glob(f'crew_shift/{month}「あさか丸」乗組員勤務表*.xlsx')
+    latest_file = max(files, key=os.path.getctime)
+    return latest_file   
+
+#勤務実態表から乗組員勤務表へのコピーを部分的に修正します
+def modify_work_records(n_work_wb, work_records_wsheet):
+    # n_work_wb の全シートを処理
+    for sheet_name in n_work_wb.sheetnames:
+        sheet = n_work_wb[sheet_name]
+        for i in range(7, 38):  # C7からC37までの範囲で処理
+            # I列が空白で、C列に'日勤'が記載されている行を'休'に変更し、D列を空白に
+            if sheet[f'I{i}'].value is None and sheet[f'C{i}'].value == '日勤':
+                sheet[f'C{i}'] = '休日'
+                sheet[f'C{i}'].font = Font(color="FF0000")  # 赤色を指定
+                sheet[f'D{i}'] = None
+
+            # ここから先の既存の処理
+            if sheet[f'C{i}'].value == '休日' and sheet[f'D{i}'].value is not None:
+                # C列が'休日'でD列が空白でない場合、Dを空白にする
+                sheet[f'D{i}'] = None
+            elif sheet[f'C{i}'].value == '明け' and sheet[f'D{i}'].value is None:
+                # C列が'明け'でD列が空白の場合、前の行のD列をコピー
+                sheet[f'D{i}'] = sheet[f'D{i-1}'].value
+                sheet[f'D{i}'].font = Font(color="000000")  # 黒色を指定
+
+            # work_records_wsheetのC7～37を確認
+            work_duty = work_records_wsheet[f'C{i}'].value if i <= 37 else None  # work_records_wsheet の範囲を超えないように調整
+            if work_duty in ['休日▲', '▲休日'] and sheet[f'C{i}'].value == '休日':
+                # 対応するsheetのC列が'休'であれば、'▲休'に変更
+                sheet[f'C{i}'] = '▲休日'
+                sheet[f'C{i}'].font = Font(color="FF0000") 
+
+#勤務実態表から乗組員勤務表へのコピー
+def copy_work_records(n_work_wb, month_str):
+    # 勤務実態表ファイルを探す
+    work_records_path = 'work_records'
+    files = os.listdir(work_records_path)
+    work_records_file = next((file for file in files if file.startswith(month_str)), None)
+    if work_records_file is None:
+        print(f"{month_str}で始まるファイルが見つかりません。")
+        return
+
+    work_records_wbook = load_workbook(os.path.join(work_records_path, work_records_file))
+    work_records_wsheet = work_records_wbook.active
+
+    # n_work_wb の全シートを処理
+    for sheet_name in n_work_wb.sheetnames:
+        sheet = n_work_wb[sheet_name]
+        for i in range(7, 38):  # C7からC37まで
+            duty = work_records_wsheet[f'C{i}'].value
+            if duty in ['日勤', '当直']:
+                # A列で一致する行をn_work_wbのシートで探す
+                day = work_records_wsheet[f'A{i}'].value
+                for j in range(7, 38):  # n_work_wbのシートのA7からA37まで探す
+                    if sheet[f'A{j}'].value == day and sheet[f'C{j}'].value == '日勤':
+                        # データをコピー
+                        for col in [('D', 'E'), ('F', 'G'), ('H', 'I'), ('J', 'K'), ('L', 'M')]:
+                            sheet[f'{col[1]}{j}'] = work_records_wsheet[f'{col[0]}{i}'].value
+                        if duty == '当直':
+                            sheet[f'C{j}'].value = '当直'
+                            sheet[f'C{j}'].font = Font(color="000000")  # 黒色を指定
+                            # 次の行にデータをコピーし、「明け」に設定
+                            for col in [('D', 'E'), ('F', 'G'), ('H', 'I'), ('J', 'K'), ('L', 'M')]:
+                                sheet[f'{col[1]}{j+1}'] = work_records_wsheet[f'{col[0]}{i+1}'].value
+                            sheet[f'C{j+1}'].value = '明け'
+                            sheet[f'C{j+1}'].font = Font(color="000000")  # 黒色を指定
+                            break
+    modify_work_records(n_work_wb, work_records_wsheet)                    
+    work_records_wbook.close
+
+def create_crew_commuting(month_str, n_work_wb):
+    # 乗組員通勤費明細書のテンプレートからmonthを頭に付けたファイルを作成します
+    new_filename = f"{month_str}あさか丸乗組員通勤費明細書.xlsx"
+    template_path = 'commuting_allowance.xlsx'
+    new_file_path = generate_new_filename(os.path.join('crew_shift', new_filename))
+    workbook = load_workbook(template_path)
+    template_sheet = workbook.active  # テンプレートのアクティブシートを取得
+
+    # 乗組員勤務表でシート毎に処理します
+    for sheet_name in n_work_wb.sheetnames:
+        if sheet_name in workbook.sheetnames:
+            n_sheet = n_work_wb[sheet_name]
+            t_sheet = workbook[sheet_name]
+
+            # 日付に基づいて往路と復路の交通費を計算する
+            for i in range(7, 38):  # 日付の範囲
+                duty = n_sheet[f'C{i}'].value
+                if duty == '日勤':
+                    # 日付けに応じたセルに○を入れる
+                    day = i - 6
+                    if day <= 10:
+                        t_sheet[f'D{25 + day}'].value = t_sheet[f'E{25 + day}'].value = '○'
+                    elif day <= 20:
+                        t_sheet[f'G{15 + day}'].value = t_sheet[f'H{15 + day}'].value = '○'
+                    elif day <= 31:
+                        t_sheet[f'J{5 + day}'].value = t_sheet[f'K{5 + day}'].value = '○'
+                elif duty == '当直':
+                    day = i - 6
+                    if day <= 10:
+                        t_sheet[f'D{25 + day}'].value = '○'
+                    elif day <= 20:
+                        t_sheet[f'G{15 + day}'].value = '○'
+                    elif day <= 31:
+                        t_sheet[f'J{5 + day}'].value = '○'
+                elif duty == '明け':
+                    day = i - 6
+                    if day <= 10:
+                        t_sheet[f'E{25 + day}'].value = '○'
+                    elif day <= 20:
+                        t_sheet[f'H{15 + day}'].value = '○'
+                    elif day <= 31:
+                        t_sheet[f'K{5 + day}'].value = '○'
+
+    # ファイルを保存します
+    workbook.save(new_file_path)
+    return new_file_path
+
+def download_file(filepath):
+    # filepath = 'work_records/sample.xlsx'  # ダウンロードさせたいファイルのパス
+    return send_file(filepath, as_attachment=True)
 
 logging.basicConfig(filename='utility.log', level=logging.INFO, 
                     format='%(asctime)s %(levelname)s:%(message)s')

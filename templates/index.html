@@ -76,13 +76,40 @@
 			// 成功時の処理
 			console.log(data.message);
 			alert(data.message);  // サーバーからの成功メッセージを表示
+			window.location.href = data.redirect;
 		})
 		.catch(error => {
 			// エラーハンドリング
 			console.error('Error:', error);
 			alert(`エラーが発生しました: ${error.message}`);
 		});
-	}		
+	}
+	fetch('/sheet_selector')
+        .then(response => response.json())
+        .then(data => {
+            window.location.href = `/sheet_selector?month_str=${encodeURIComponent(data.month_str)}`;
+        });	
+	window.onload = function() {
+		// 最初のファイルがある場合にダウンロード
+		var filename = "{{ filename }}";
+		if (filename) {
+			var url1 = "{{ url_for('download_file', filename=filename) }}";
+			var iframe1 = document.createElement('iframe');
+			iframe1.style.display = 'none';
+			iframe1.src = url1;
+			document.body.appendChild(iframe1);
+		}
+
+		// 二つ目のファイルがある場合にダウンロード
+		var newFilePath = "{{ new_file_path }}";
+		if (newFilePath) {
+			var url2 = "{{ url_for('download_file', filename=new_file_path) }}";
+			var iframe2 = document.createElement('iframe');
+			iframe2.style.display = 'none';
+			iframe2.src = url2;
+			document.body.appendChild(iframe2);
+		}
+	}			
 </script>
 </body>
 </html>

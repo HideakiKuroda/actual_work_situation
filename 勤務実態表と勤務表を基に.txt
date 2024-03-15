@@ -9,10 +9,6 @@ new_filename = f"{session['monthSelect']}「あさか丸」乗組員.xlsx"
 
 １．勤務表テンプレートの作成   asaka_shift_schedule.xlsx   D3  G3   J3  N3  Q3  T3
 
-２．勤務表ファイルを作成　日付「あさか丸」乗組員勤務表 
-	B2 →　２０２４年２月　勤務表　　
-	職別　D7～D37 　　　　E,H,K,N,Q,T 5～35　を　コピー担当シート毎に　
-
 ３．勤務表テンプレートの6人の名前のSheetを作成　
 
 ４．その月の日付と曜日を挿入->　勤務実態表からコピー
@@ -20,16 +16,105 @@ new_filename = f"{session['monthSelect']}「あさか丸」乗組員.xlsx"
 2024/02/10 済
 
 D3にそれぞれの名前を入れる
+02/11 済
 
 ５．個々の乗組員の勤務スケジュール（職別）をコピー　あさか丸勤務表→乗組員勤務表
+２．勤務表ファイルを作成　日付「あさか丸」乗組員勤務表 
+	B2 →　２０２４年２月　勤務表　　
+	職別　D7～D37 　　　　E,H,K,N,Q,T 5～35　を　コピー担当シート毎に　
+
+あさか丸勤務表のファイルとシートを選択
+D3 G3 J3 M3 P3 S3 
+シート名の頭2文字が上記の記載の文字列と一致する
+E,H,K,N,Q,T 5～35　を　コピー担当シート毎に　C7～37　にコピー
+
+
 
 ６．勤務実態表　から　職別
+
+関数の引数はn_work_wb,month_str
+として
+勤務実態表のmonthがファイル名の前半と一致するものを取得して、
+ work_records_path = 'work_records'
+            files = os.listdir(work_records_path)
+			work_records_file =　any(file.startswith(month_str) for file in files)
+			work_records_wbook = load_workbook(work_records_file)
+			work_records_wsheet = work_records_wbook.active
+
+for sheet in n_work_wb.sheetnames:
+
+ここの処理ですが、work_records_wsheet　の　C7～37 の文字列が'日勤'と一致する場合、同A（f'A{i}'）の数字と
+一致する数字をn_work_wb.sheet　のA7～37の中から見つけます。
+見つけた行にwork_records_wsheetの（f'D{i}'）,（f'F{i}'）,（f'H{i}'）,（f'J{i}'）,（f'L{i}'）のデータを
+n_work_wb.sheetで見つかった行、E,G,I,K,M コピーします。
+この後に付け加えで、「ただし、n_work_wb.sheetで見つかった行のC列が'日勤'であった場合のみ」
+を追加してください。’当直’の場合も同じで「C列が'日勤'であった場合のみ」、’明け’は'当直'とセットでCが’日勤’である必要はありません。
+
+さらに
+work_records_wsheet　の　C7～37 の文字列が'当直'と一致する場合、同A（f'A{i}'）の数字と
+一致する数字をn_work_wb.sheet　のA7～37の中から見つけます。
+見つけた行にwork_records_wsheetの（f'D{i}'）,（f'F{i}'）,（f'H{i}'）,（f'J{i}'）,（f'L{i}'）のデータと次の行
+（f'D{i+1}'）,（f'F{i+1}'）,（f'H{i+1}'）,（f'J{i+1}'）,（f'L{i+1}'）を
+n_work_wb.sheetで見つかった行、E,G,I,K,M コピーし、Cを'当直'に変換、
+更に次の行、E,G,I,K,M にi+1をコピーし、Cを'明け'に変換します。
+
+
+別の関数を作成して前の関数に埋め込みます。
+def modifi_work_records(n_work_wb, work_records_wsheet):
+    # n_work_wb の全シートを処理
+   for sheet_name in n_work_wb.sheetnames:
+        sheet = n_work_wb[sheet_name]
+処理は全シートです。
+C 列が　'休日'の場合でD列が空白でない行はDを空白に
+C 列が　'明け'の場合にD列が空白の場合は、（f'D{i-1}'）をコピーする
+work_records_wsheet　のC7～37 の文字列が'休▲'または'▲休'の場合に、対応するsheetの文字列が'休'である場合のみ、これを'▲休'に変更する
+以上
+追加、I列が空白であるにも関わらず、同じ行の　C列に　'日勤'　と期されている場合、これを'休'とし、Dを空白にします。
+尚、この処理は
+if work_duty in ['休▲', '▲休'] and sheet[f'C{i}'].value == '休':
+の前に行います。
+
+
 
 ７．勤務実態表から　日勤　を　職別の記入されている行にコピー
 
 ８。当直　を　職別の記入されている行に、次の　明け　と一緒にコピー　明け　職別が記入されていない（休日）なっている場合は当直の職別をコピー
 
+交通費のファイルを作成し編集する」メソッドを作りますので協力お願いします。
+テンプレート　commuting_allowance.xlsx　を使用（カレントディレクトリ）
+乗組員勤務表からデータを取得します。
 
+@app.route('/copy_data_to_n_work_file', methods=['POST', 'GET'])
+def copy_data_to_n_work_file():
+
+の中に関数として入れ込むものを作成してください。
+
+関数の名前と初めは下記のとおり、
+
+def create_crew_commuting(month_str,n_work_wb)
+	#乗組員通勤費明細書のテンプレートからmonthを頭に付けたファイルを作成します
+	new_filename = f"{month_str}あさか丸乗組員通勤費明細書.xlsx"
+	template_path = 'commuting_allowance.xlsx'
+	new_file_path = generate_new_filename(os.path.join('crew_shift', new_filename))
+	workbook = load_workbook(template_path)
+
+乗組員通勤費明細書の編集部分は下記の通りで、日付に対して往路と復路の通勤費が必要な場合に〇を入れます
+1日～10日	C26～35		往路　D　復路　E
+11日～20日	F26～35		往路　G　復路　H
+21日～31日	I26～36		往路　J　復路　K
+
+D,E,G,H,J,Kに〇を入れて出勤した日の交通費を計算します。
+ファイル内で”=COUNTIF(C26:K36,"○")”によって計算されます。
+
+#n_work_wbは乗組員勤務表でシート毎に処理します。
+for sheet_name in n_work_wb.sheetnames:
+        sheet = n_work_wb[sheet_name]
+
+乗組員勤務表（n_work_wb）のsheet名と、workbook（乗組員通勤費明細書）のsheet名が合致するものに対して操作を行う
+n_work_wbのC7～37に'勤務'とある日付けはworkbookの往路＆復路に〇を入れる
+'当直'の場合は、往路に〇、'明け'の場合は復路に〇
+
+この関数を完成させてください。よろしくお願いします。
 
 
 

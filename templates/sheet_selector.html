@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乗組員勤務表作成</title>
+    <!-- Tailwind CSSのCDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+	{% with messages = get_flashed_messages() %}
+	{% if messages %}
+	  {% for message in messages %}
+		<script >alert('{{ message }}');</script>
+	  {% endfor %}
+	{% endif %}
+  	{% endwith %}
+	<div class="container mx-auto mt-5">
+        <h1 class="text-xl font-bold mb-4 ml-5">{{ month_str }}-乗組員勤務表作成</h1>
+    </div>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input  type="file" name="file" class="mt-5 ml-10 w-80"/>
+        <input type="button" value="このファイル使用" onclick="uploadFile()" class="mt-5 ml-2 w-36 text-white bg-indigo-500 hover:bg-indigo-600 focus:ring-4 focus:ring-indigo-300 font-medium rounded-lg text-sm px-2 py-2 me-2 mb-2 dark:bg-indigo-400 dark:hover:bg-indigo-500 focus:outline-none dark:focus:ring-indigo-800"/>
+    </form>
+    <form id="sheetsForm">
+        <button onclick="selectSheet()"  id="sheetsDiv2" style="display:none;" class="mt-5 ml-10 w-36 text-white bg-green-500 hover:bg-green-600 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-2 py-2 me-2
+        mb-2 dark:bg-indigo-400 dark:hover:bg-green-500 focus:outline-none dark:focus:ring-green-800">Sheet名を選択</button>
+        <div id="sheetsDiv" style="display:none;" class="mt-5 ml-10 fileCheckbox">
+            <!-- Sheets will be listed here as radio buttons -->
+        </div>
+    <button onclick="selectSheet()"  id="sheetsDiv3" style="display:none;" class="mt-5 ml-10 w-36 text-white bg-green-500 hover:bg-green-600 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-2 py-2 me-2
+    mb-2 dark:bg-indigo-400 dark:hover:bg-green-500 focus:outline-none dark:focus:ring-green-800">Sheet名を選択</button>
+    </form>
+   
+     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        function selectSheet() {
+            var form = document.getElementById('sheetsForm');
+            form.method = "POST";
+            form.action = '/copy_data_to_n_work_file';
+            form.submit(); // フォームを送信する
+        }
+        // function selectSheet() {
+        //     var radios = document.getElementsByName('sheetName');
+        //     var selectedSheetName = null;
+        //     for (var i = 0; i < radios.length; i++) {
+        //         if (radios[i].checked) {
+        //             selectedSheetName = radios[i].value;
+        //             break;
+        //         }
+        //     }
+        //     if (selectedSheetName !== null) {
+        //         var encodedSheetName = encodeURIComponent(selectedSheetName);
+        //         var data = JSON.stringify({ sheetName: selectedSheetName });
+        //         $.ajax({
+        //             type: 'POST',
+        //             url: '/sheet_selector',
+        //             data: data,
+        //             contentType: 'application/json',
+        //             success: function() {
+        //                 window.location.href = '/copy_data_to_n_work_file/' + encodedSheetName;
+        //             }
+        //         });
+        //     } else {
+        //         alert('シートが選択されていません。');
+        //     }
+        // }
+
+
+        function uploadFile() {
+            // console.log('Upload','')
+            var formData = new FormData(document.getElementById('uploadForm'));
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(response) {
+                    console.log('getSheets:', response.filename);
+                    getSheets(response.filename); // シート名のリストを取得
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.log('AJAX Error:', textStatus, errorThrown);
+                }
+            });
+        }
+        function getSheets(filename) {
+            $.ajax({
+                url: '/sheets',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({filename: filename}),
+                success: function(sheets) {
+                    var sheetsDiv = document.getElementById('sheetsDiv');
+                    var sheetsDiv2 = document.getElementById('sheetsDiv2');
+                    var sheetsDiv3 = document.getElementById('sheetsDiv3');
+                    sheetsDiv.innerHTML = ''; // 既存のコンテンツをクリア
+                    sheetsDiv.style.display = 'block'; // シート選択部分を表示
+                    sheetsDiv2.style.display = 'block'; 
+                    sheetsDiv3.style.display = 'block'; 
+                    sheets.forEach(function(sheetName, index) {
+                        // ラジオボタンとラベルの生成
+                        var radioButton = document.createElement('input');
+                        radioButton.type = 'radio';
+                        radioButton.id = 'sheet' + index;
+                        radioButton.name = 'sheetName';
+                        radioButton.value = sheetName;
+
+                        var label = document.createElement('label');
+                        label.htmlFor = 'sheet' + index;
+                        label.appendChild(document.createTextNode(sheetName));
+
+                        // ラジオボタンとラベルをsheetsDivに追加
+                        sheetsDiv.appendChild(radioButton);
+                        sheetsDiv.appendChild(label);
+                        sheetsDiv.appendChild(document.createElement('br')); // 改行を追加
+                    });
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.log('AJAX Error:', textStatus, errorThrown);
+                }
+            });
+        }
+        // Function to get sheets and populate them as radio buttons
+        // Function to handle sheet selection and fetch data
+    </script>
+</body>
+</html>
